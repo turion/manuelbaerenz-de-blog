@@ -93,8 +93,7 @@ and it does indeed what we expect:
 ![Gif showing app]
 
 To see which external libraries, language extensions and imports you need,
-have a look at the source code
-(insert link)[]
+have a look [at the source code](https://github.com/turion/manuelbaerenz-de-blog/tree/master/02TheEssenceofLivecoding).
 
 ```{include=02TheEssenceofLivecoding/Version0.md}
 ```
