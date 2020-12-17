@@ -116,12 +116,19 @@ have a look [at the source code](https://github.com/turion/manuelbaerenz-de-blog
 
 ### To do
 
+* Split into
+  1. Webapp introduction
+  2. Make changes ()
+* When a piece of code didn't change, briefly repeat what it does
+* When a code change comes, say what was before and what is now
+
 #### Write
 
 * cabal setup
 * Insert GIF of first counter
 * Insert GIF of counter + vscodium + ghcid
 * Possibly show more relevant imports
+* This is literate Haskell  you can run it
 
 #### Surrounding
 
