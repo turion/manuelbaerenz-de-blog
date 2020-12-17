@@ -107,7 +107,7 @@ The server keeps the counter state and adds the last access time
 
 ![Gif]
 
-#### But... how?!
+### But... how?!
 
 I admit, `essence-of-live-coding` does some magic under the hood.
 Once you understand it, it ceases to be magic,

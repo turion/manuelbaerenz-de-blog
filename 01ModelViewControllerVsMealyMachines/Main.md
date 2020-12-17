@@ -23,8 +23,19 @@ import Graphics.Gloss.Interface.Pure.Game
 ```
 -->
 
+## Live coding a web application, Part 0
 
-### Model-View-Controller vs. transducers & resumptions, or: Mealy vs. Moore
+The following blog posts will lead you through the development of a simple web application
+using the live coding framework [`essence-of-live-coding`](https://github.com/turion/essence-of-live-coding) in Haskell.
+This "zeroth" post is mostly about some theoretical background involving state machines,
+but no worries, we will get our hands dirty already here!
+At the end, you will have a little example web application _and_ a graphics application running.
+
+Every blog post is written in literate Haskell,
+and can be compiled and run.
+Simply check out [the repository](https://github.com/turion/manuelbaerenz-de-blog/).
+
+## Model-View-Controller vs. transducers & resumptions, or: Moore vs. Mealy
 
 In programming, there is a recurring, vague concept of "internal state", "input" and "output".
 It returns in many forms and facets.
@@ -36,7 +47,7 @@ Also, let's write a simple web application,
 and a simple graphical application,
 using these paradigms.
 
-#### Why bother?
+### Why bother?
 
 Most programs can in principle be described by a state machine.
 They consume some kind of input, be it as files, network, standard input, user interaction,
@@ -57,7 +68,7 @@ And we _do_ want to do live coding,
 and we will do live coding.
 Stay tuned for a later blog post.
 
-#### Mealy machines
+### Mealy machines
 
 The type of input values is called `i`,
 similarly the output values are of type `o`.
@@ -146,7 +157,7 @@ Then for each value `i`,
 we do one step,
 and then call `listMealy` again until we're done.
 
-#### A simple web application
+### A simple web application
 
 Let us fix a particular input and output now by looking at a popular web application library in Haskell,
 the [Web Application Interface `wai`](https://hackage.haskell.org/package/wai-3.2.2.1/docs/Network-Wai.html#t:Application):
@@ -217,7 +228,7 @@ $ curl localhost:8080
 There have been 2 visitors!
 ```
 
-### Model-View-Controller
+## Model-View-Controller
 
 MVC is one of the oldest design patterns for interactive applications,
 reaching back to the '70s.
@@ -258,10 +269,10 @@ But what is `Moore`, you ask?
 "The inventor of Model-View-Controller?"
 In fact not.
 We have reproduced a concept known as well since the '50s,
-called "Moore machines",
+called ["Moore machines"](https://en.wikipedia.org/wiki/Moore_machine),
 after their eponymous inventor.
 
-#### Two kinds of state machines? That is too complicated!
+### Two kinds of state machines? That is too complicated!
 
 Let us reduce complexity then,
 and embed Moore machines into Mealy machines.
@@ -312,10 +323,11 @@ The disadvantages are obvious:
 We increased the size of the internal state,
 and we introduced the possibility of failure through incorrect usage.
 
-But we gain a huge advantage:
+But by leaving Mealy machines for Moore machines,
+we gain a huge advantage:
 _Moore machines can be used asynchronously._
 
-#### UIs are asynchronous
+### UIs are asynchronous
 
 ...because users don't necessarily consume the view at the same time they manipulate the model.
 To illustrate this,
@@ -403,4 +415,28 @@ It will look something like this:
 
 ![myGlossApp](images/myGlossApp.gif)
 
-### Where to go from here?
+## Where to go from here?
+
+Extracting the state as a single, explicit value has an immense advantage:
+It allows us to do _live coding_ on it.
+How that works is the topic of the next few blog posts.
+The rough idea is that we've separated the program's _state_ from its _behaviour_,
+and when live coding we want to keep the state as good as we can when we change the program.
+
+Having a single state variable also has a huge disadvantage:
+The code is not modular at all.
+Every detail of the program has to go in this single machine description.
+Reusing "one half" of your program elsewhere is not possible,
+because there is no natural subdivision of a state machine.
+Spoiler alert:
+Mealy machines can be composed easily,
+while Moore machines require more coordination.
+The composition of Mealy machines will lead us naturally to _synchronous Functional Reactive Programming (FRP)_
+(as embodied for example by [Yampa](hackage.haskell.org/package/Yampa) and [Dunai](http://hackage.haskell.org/package/dunai)),
+while the composition of Moore machines will lead us to _clocked, asynchronous FRP_
+(as embodied by [`rhine`](https://github.com/turion/rhine)).
+
+But now I'm getting a handful of blog posts ahead of myself,
+and I should return to the immediate goals:
+In the next two posts, we will write a more interactive web application,
+and I'll show you how to do real live coding!

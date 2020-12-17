@@ -22,7 +22,7 @@ import Version0
 ```
 -->
 
-#### Change the program...
+### Change the program...
 
 Suppose we also want to be able to _decrement_ the counter.
 Let's build the UI part:

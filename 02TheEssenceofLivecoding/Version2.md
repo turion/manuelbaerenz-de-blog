@@ -24,7 +24,7 @@ import Version1 hiding (mutate)
 ```
 -->
 
-#### ...keep the state?!
+### ...keep the state?!
 
 It's getting really interesting as soon as we change the _internal state type_ of our web application.
 How about we don't only display the counter,
