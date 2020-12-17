@@ -13,6 +13,7 @@ let
       http-client = self.http-client_0_7_2_1;
       essence-of-live-coding = self.essence-of-live-coding_0_2_4;
       pandoc-include-code = pkgs.haskell.lib.doJailbreak super.pandoc-include-code;
+      essence-of-live-coding-warp = pkgs.haskell.lib.markUnbroken super.essence-of-live-coding-warp;
     };
   };
 
