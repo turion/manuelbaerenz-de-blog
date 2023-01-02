@@ -1,6 +1,8 @@
 # Introduction
 
 There are plenty of "simple prob. monad from scratch", this is an advanced thing.
+Much has been talked about how to represent probabilities,
+but it's a different story how to do useful things with them, and the choices of how to represent them have a huge influence on that.
 
 [ ] This blog post follows the version xyz of library foo
 
@@ -155,9 +157,9 @@ Caveat, if you make the list too long for discrete or mixture models, you suffer
 
 ## Sampling
 
-## Recovering probability
+## Recovering/evaluating probability
 
-In the Kolmogorov viewpoint, one ought to have a function `m a -> Subset a -> real` which returns the probability of `a` occurring.
+In the Kolmogorov viewpoint, one ought to have a function `evalProb :: m a -> Subset a -> real` which returns the probability of `a` occurring.
 The type of `a` will dictate which `Subset a` are implementable.
 (One needs a membership function for `Subset` to make sense.)
 If `a` is real, one would use `[Interval a]`, if `a` is discrete, `[a]`.
@@ -180,7 +182,21 @@ because then one has `score x <|> score y = score (x + y)`.
 One uses these to implement part of Bayes' rule.
 One computes a likelihood and gives it to `score`.
 Summing over all possible result values implements Bayesian inference.
-Note that this breaks the abstraction of the
+This can be done either because one uses `Alternative` (or `Selective`) to branch,
+or `Monad`.
+
+But this breaks the abstraction of the probability monad.
+It only works if one has a probability evaluation function,
+and there is no straightforward way in general to go from the probability type to that function.
+So, one often has to do this separately of the other capabilities.
+
+For discrete distributions, this is very easy to implement.
+Likewise for mixture models.
+For semantic embeddings and explicit distributions, not so much.
+
+A further issue here is that the total probability mass changes.
+So to compute a probability, one needs to normalize, which is often expensive.
+[ ] In what cases is it not a problem? Sampling?
 
 ## Inference
 
@@ -198,4 +214,103 @@ In principle, `Functor` already gives marginalisation in the special case of `fm
 
 ## Bayes theorem
 
+To do inference, one generally wants to implement Bayes' rule somehow.
+Conditioning offers a simple way to do this, but it's actually too powerful.
+Bayes' rule in a type signature is in general:
+
+```haskell
+bayes :: Eq b => m a -> (a -> m b) -> b -> m a
+```
+But this is often not straightforward to implement,
+chiefly because the function in the second argument is not introspectable,
+so one cannot use it to create a new distribution.
+All that one can do with this function is evaluate it.
+[ ] Does https://acatalepsie.fr/posts/overloading-lambda or https://hackage.haskell.org/package/overloaded-0.3.1/docs/Overloaded-Categories.html help?
+So a typical implementation in terms of `Alternative` (which in turn may be implemented in terms of `score`) may look like:
+
+```haskell
+bayes ma f b = do
+  a <- ma
+  b' <- f a
+  guard $ b == b'
+  return a
+```
+But this is not a feasible computation in most cases.
+For discrete distributions, this is fine.
+The semantic thingies don't have `guard` though.
+Also, continuous distributions don't work here because they can't deal with `guard` in a sensible way,
+because the probability for a single value is 0.
+
+A workaround is importance sampling, where we have a function `softEq :: b -> b -> real`,
+and we do:
+
+```haskell
+bayes ma f b = do
+  a <- ma
+  b' <- f a
+  score $ b `softEq` b'
+  return a
+```
+But now the inference is not exact anymore.
+
+A different general implementation that may be exact in terms of `score` and `evalProb` may be:
+
+```haskell
+bayes ma f b = do
+  a <- ma
+  score $ evalProb (f a) $ singleton b
+  return a
+```
+
+This can often not be implemented because `evalProb` is hard to implement.
+
+All the above approaches have the issue related to normalization.
+Even if one only samples from the posterior, one must take care that the total probability mass has not decreased too much.
+This is problematic when repeating the bayes step many times, then the mass decreases exponentially.
+
 ## Conjugate probabilities
+
+For some specific distributions, exact Bayesian inference is known.
+But if the likelihood is expressed as a function `a -> m b`,
+one doesn't know what conditional distribution this is.
+
+[ ] Maybe it is possible to understand this better with a HOAS approach like https://acatalepsie.fr/posts/overloading-lambda
+[ ] Or with operational because then we can control the type of `a`?
+
+So in a sense, the embedding is too deep for this kind of reflection!
+
+This gets easier when we have more shallow embedding.
+One can define some types of arrows:
+
+```haskell
+data Normal a b where
+  Normal :: StdDev -> Normal real real
+```
+Since the normal distribution is its own conjugate, one can define:
+
+[ ] This doesn't make sense, there is no input of type ()
+```haskell
+bayes :: Normal () a -> Normal a b -> Normal b a
+```
+[ ] Calculate this and make sure it makes sense
+
+[ ] Or is it:
+```haskell
+bayes :: Normal () a -> Normal a b -> b -> Normal () a
+```
+
+[ ] Is this still useful after defining the free arrow over this?
+
+More generally, if one has conjugate families, one might define:
+
+```haskell
+class Conjugate p l where
+  bayes :: p () a -> l a b -> p b a
+```
+
+Even more generally, one would be interested in conditionally conjugate families:
+
+```haskell
+class Conjugate p l where
+  bayes :: p x a -> l a b -> p (x, b) a
+```
