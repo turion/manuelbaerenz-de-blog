@@ -21,7 +21,7 @@ but it's a different story how to do useful things with them, and the choices of
 
 # Kinds of probability type operators
 
-In principle two kinds of type operators.
+In principle three kinds of type operators.
 Like with embedding any kind of computation in an existing language,
 one has the choice of deep embeddings (embed the semantics of the computation you want to represent in the semantics of the target language)
 and shallow embeddings (embed the syntax as data and the computation rules as functions).
@@ -32,50 +32,94 @@ The disadvantage is restriction to the chosen model.
 
 [ ] Check that this is the standard terminology for deep/shallow
 
-## Semantic embeddings
+On this continuum, there are three main approaches, from deep to shallow:
+
+1. The definition (Kolgomorov)
+2. Sampling
+3. Synthetic
+
+## Definition
+
+In the original Kolmogorov definition, a probability measure on a type `a` is something that assigns a number to (certain well-behaved) subsets of `a`.
+One ought to have a function `evalProb :: m a -> Subset a -> real` which returns the probability of `a` occurring.
+Extremely, one could define `type Prob a = Subset a -> real`.
+
+The type of `a` will dictate which `Subset a` are implementable.
+One needs a membership function `elem :: Subset a -> a -> Bool` for it to make sense.
+
+If `a` is real, one would use `[Interval a]`, if `a` is discrete, `[a]`.
+In general, `Subset a = a -> Bool` is possible, since this is the final encoding of the membership function.
+(This idea will return later when we talk about conditioning.
+[ ] Make sure it does
+)
+
+But it's hard to actually compute with this definition.
+1. It puts way to much burden on the implementor.
+We suddenly have to invent this `Subset a` type, and if we make a complicated choice like `a -> Bool` we have no idea how to get a good number out of `evalProb`.
+2. The encoding is far from being tight: Nothing in the data structures ensures that subsets behave properly, or that probabilities sum to 1 and so on.
+
+### Monad hierarchy
+
+It's not a functor in the obvious sense already because `Subset a` is not always a contravariant functor.
+If we choose `Subset a = a -> Bool`, it is, and then `Prob a` is a functor.
+But if we take anything computable like `[a]` or `[Interval a]`, we have to sum or integrate the probability over the preimage.
+For summing, we'd need `Eq a`, and integrating (or infinite sums) exactly is not computable in general.
+
+## Sampling
 
 [ ] Find in the literature whether this has a name already.
 
-Basically `RandomT m a = ReaderT r m a` such that `r` models a sample space.
+Basically `newtype RandomT m a = RandomT (StateT r m a)` such that `r` models a sample space.
 This mimics the definition of a probability distribution as a function from a sample space to an event space.
-[ ] This is not the standard Kolmogorov definition
+
+One expects a function `splitGen :: r -> (r, r)` to exist for `r`, and implements the central interface:
+
+```haskell
+gen = randomT $ do
+  r <- get
+  let (r', r'') = splitGen r
+  put r''
+  return r'
+```
+
+Every time one needs a source of randomness, one uses `gen`.
+This way, one can create a stream of `a`s.
+So sampling is really easy.
 
 ### Choice of `r`
 
 Standard is the interval from 0 to 1.
 Novel is Sam Staton et al.'s infinitely branching infinite tree which is useful for lazy calculations.
 
-### Sampling
+### How to run sampling
 
+To execute this monad, we
 Essential that we have a `random :: m r`.
 Given that, we can implement `runRandom :: ReaderT r m a -> m a`.
 
-Otherwise one expects a function `splitGen :: r -> (r, r)` to exist for `r`, so one can create a stream of `a`s.
-So sampling is really easy.
-
 ### Haskell type classes
 
-This is automatically a `Functor`, but it's not an `Applicative` in the obvious sense,
-since the `Applicative` from `ReaderT` would make every sample drawn the same.
-For the same reason it's not a `Monad`.
-There is a `Monad` shim by using a `splitGen :: r -> (r, r)`,
-but if one implements this in the straightforward way, it doesn't obey the laws.
+This automatically a `Functor`: Sample a value and apply a function to it.
+It also borrows `Applicative` and `Monad` from `StateT`.
+
+Footnote:
+
+There is a `Monad` shim by using a `splitGen :: r -> (r, r)` in the definition of `(>>=)` by passing the split generators to each argument.
+But it doesn't obey the laws.
 It's not obvious to observe the broken laws if one interprets all the values as strictly random,
-but if one wants to reproduce the randomly generated things, one sees that e.g. `return () >> m /= m`
-One can write a lawful `Monad` by using a free monad or a `ProgramT` construction,
-which then only splits the generator when the randomness is actually used.
+but if one wants to reproduce the randomly generated things, one sees that e.g. `return () >> m /= m`.
 
 ### Statistics
 
-The definition of a statistic is a function `RandomT Identity a -> a`
+The definition of a statistic is a function `m a -> b` where `m` is some randomness monad.
 [ ] Is this a good definition?
 
-This is a weakness of this approach.
+This is a weakness of the sampling approach.
 One cannot compute statistics of a distribution exactly.
 One can approximate it by sampling from the stream and computing the statistics over that.
 Basically, Monte Carlo.
 
-## Representations of probability distribution families (syntactic embeddings)
+## Synthetic: Representations of probability distribution families (syntactic embeddings)
 
 One chooses a family of p.d.s and implements their parameters as datatypes, and then tries to implement all the useful capabilities on that family.
 
@@ -84,6 +128,8 @@ One chooses a family of p.d.s and implements their parameters as datatypes, and 
 #### Discrete
 
 The most popular choice is the discrete probability distribution, because it is easy to implement and has the most capabilities.
+This is also the choice that most people talk about when they introduce probability monads.
+
 So this is `DiscreteT real m a = m [(real, a)]`.
 Note that if you're able to observe the order of the tuples, it's not a monad transformer.
 Really, one wants a kind of set instead of a list, but then it's not so obvious how to make it a functor.
@@ -157,15 +203,9 @@ Caveat, if you make the list too long for discrete or mixture models, you suffer
 
 ## Sampling
 
-## Recovering/evaluating probability
+### Recovering/evaluating probability
 
-In the Kolmogorov viewpoint, one ought to have a function `evalProb :: m a -> Subset a -> real` which returns the probability of `a` occurring.
-The type of `a` will dictate which `Subset a` are implementable.
-(One needs a membership function for `Subset` to make sense.)
-If `a` is real, one would use `[Interval a]`, if `a` is discrete, `[a]`.
-In general, `a -> Bool` is possible.
-
-How well the probability is computable is a different question.
+How well the probability density (original definition of probability) is computable from the sampling or the synthetic viewpoint depends on the choice.
 For explicit distributions, this can be `O(1)` for a singular set.
 But when applying Coyoneda or free monads, you already lose this property.
 For discrete distributions or mixture models, require `Ord a` to upgrade to `O(log(n))` in the length of the list, or `O(n)` otherwise.
